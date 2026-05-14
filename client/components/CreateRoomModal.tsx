@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUser } from '@clerk/nextjs';
 import {
   Dialog, DialogContent, DialogHeader,
   DialogTitle, DialogTrigger,
@@ -16,9 +15,10 @@ import {
 import { Plus } from 'lucide-react';
 import { LANGUAGES } from '@/types';
 
+const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
+
 export default function CreateRoomModal() {
   const router = useRouter();
-  const { user } = useUser();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -29,17 +29,17 @@ export default function CreateRoomModal() {
     if (!name.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:4000/api/rooms', {
+      const res = await fetch(`${SOCKET_URL}/api/rooms`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name,
           description,
           language,
-          clerkId: user?.id,
-          userName: user?.fullName || user?.firstName || 'Anonymous',
-          userEmail: user?.primaryEmailAddress?.emailAddress || '',
-          userAvatar: user?.imageUrl || '',
+          clerkId: `guest_${Math.random().toString(36).substring(2, 9)}`,
+          userName: 'Guest',
+          userEmail: `guest_${Date.now()}@temp.com`,
+          userAvatar: '',
         }),
       });
       const room = await res.json();

@@ -17,7 +17,7 @@ export default function JoinRoomInput() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`http://localhost:4000/api/rooms/code/${code.toUpperCase()}`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000'}/api/rooms/code/${code.toUpperCase()}`);
       const room = await res.json();
       if (room.id) {
         router.push(`/room/${room.id}`);

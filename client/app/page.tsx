@@ -4,9 +4,11 @@ import JoinRoomInput from '@/components/JoinRoomInput';
 import { Users, Code2, Clock } from 'lucide-react';
 import Link from 'next/link';
 
+const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
+
 async function getRooms() {
   try {
-    const res = await fetch('http://localhost:4000/api/rooms', {
+    const res = await fetch(`${SOCKET_URL}/api/rooms`, {
       cache: 'no-store',
     });
     if (!res.ok) return [];
