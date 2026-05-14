@@ -1,83 +1,197 @@
-import { Server, Socket } from 'socket.io';
-import { prisma } from '../lib/prisma';
+import express from 'express';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
+import cors from 'cors';
+import dotenv from 'dotenv';
 
-interface JoinRoomPayload {
-  roomId: string;
-  userId: string;
-  userName: string;
+dotenv.config();
+
+const app = express();
+const httpServer = createServer(app);
+
+const io = new Server(httpServer, {
+  cors: { origin: '*', methods: ['GET', 'POST'] },
+});
+
+app.use(cors({ origin: '*' }));
+app.use(express.json());
+
+// Track users per room
+const roomUsers: Record<string, { userId: string; userName: string; socketId: string }[]> = {};
+
+// Generate 6 digit room code
+function generateRoomCode(): string {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
-interface CodeChangePayload {
-  roomId: string;
-  code: string;
-}
+app.get('/', (req, res) => {
+  res.json({ status: 'Server is running ✅' });
+});
 
-interface ChatMessagePayload {
-  roomId: string;
-  message: string;
-  userName: string;
-  userId: string;
-}
-
-export const setupSocket = (io: Server) => {
-  io.on('connection', (socket: Socket) => {
-    console.log(`✅ User connected: ${socket.id}`);
-
-    // Join a room
-    socket.on('join-room', async ({ roomId, userId, userName }: JoinRoomPayload) => {
-      socket.join(roomId);
-      console.log(`${userName} joined room ${roomId}`);
-
-      // Notify others in the room
-      socket.to(roomId).emit('user-joined', { userId, userName, socketId: socket.id });
-
-      // Send current room code to the new user
-      try {
-        const room = await prisma.room.findUnique({ where: { id: roomId } });
-        if (room) {
-          socket.emit('load-code', { code: room.code, language: room.language });
-        }
-      } catch (err) {
-        console.error('Error loading room:', err);
-      }
+// Get all rooms
+app.get('/api/rooms', async (req, res) => {
+  try {
+    const { prisma } = await import('./lib/prisma');
+    const rooms = await prisma.room.findMany({
+      where: { isActive: true },
+      include: { _count: { select: { users: true } } },
+      orderBy: { createdAt: 'desc' },
     });
+    res.json(rooms);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch rooms' });
+  }
+});
 
-    // Code change — broadcast to everyone else in the room
-    socket.on('code-change', ({ roomId, code }: CodeChangePayload) => {
-      socket.to(roomId).emit('code-update', { code });
+// Get room by code
+app.get('/api/rooms/code/:roomCode', async (req, res) => {
+  try {
+    const { prisma } = await import('./lib/prisma');
+    const room = await prisma.room.findUnique({
+      where: { roomCode: req.params.roomCode.toUpperCase() },
     });
+    if (!room) {
+      res.status(404).json({ error: 'Room not found' });
+      return;
+    }
+    res.json(room);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch room' });
+  }
+});
 
-    // Save code to database periodically
-    socket.on('save-code', async ({ roomId, code }: CodeChangePayload) => {
-      try {
-        await prisma.room.update({
-          where: { id: roomId },
-          data: { code },
-        });
-      } catch (err) {
-        console.error('Error saving code:', err);
-      }
-    });
+// Create room
+app.post('/api/rooms', async (req, res) => {
+  try {
+    const { prisma } = await import('./lib/prisma');
+    const { name, description, language, clerkId, userName, userEmail, userAvatar } = req.body;
 
-    // Chat message
-    socket.on('chat-message', ({ roomId, message, userName, userId }: ChatMessagePayload) => {
-      io.to(roomId).emit('receive-message', {
-        message,
-        userName,
-        userId,
-        timestamp: new Date().toISOString(),
+    let user = await prisma.user.findUnique({ where: { clerkId } });
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          clerkId,
+          name: userName || 'Anonymous',
+          email: userEmail || `${clerkId}@temp.com`,
+          avatar: userAvatar || '',
+        },
       });
-    });
+    }
 
-    // Leave room
-    socket.on('leave-room', ({ roomId, userName }: { roomId: string; userName: string }) => {
-      socket.leave(roomId);
-      socket.to(roomId).emit('user-left', { userName, socketId: socket.id });
-    });
+    // Generate unique room code
+    let roomCode = generateRoomCode();
+    let exists = await prisma.room.findUnique({ where: { roomCode } });
+    while (exists) {
+      roomCode = generateRoomCode();
+      exists = await prisma.room.findUnique({ where: { roomCode } });
+    }
 
-    // Disconnect
-    socket.on('disconnect', () => {
-      console.log(`❌ User disconnected: ${socket.id}`);
+    const room = await prisma.room.create({
+  data: {
+    name,
+    description,
+    language: language || 'javascript',
+    roomCode,
+    maxUsers: 3,
+    users: { create: { userId: user.id } },
+  },
+});
+    res.json(room);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to create room' });
+  }
+});
+
+// Delete room
+app.delete('/api/rooms/:roomId', async (req, res) => {
+  try {
+    const { prisma } = await import('./lib/prisma');
+    await prisma.room.update({
+      where: { id: req.params.roomId },
+      data: { isActive: false },
     });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete room' });
+  }
+});
+
+// Socket.io
+io.on('connection', (socket) => {
+  console.log(`✅ User connected: ${socket.id}`);
+
+  socket.on('join-room', async ({ roomId, userId, userName }) => {
+    // Check max users
+    const currentUsers = roomUsers[roomId] || [];
+    if (currentUsers.length >= 3) {
+      socket.emit('room-full');
+      return;
+    }
+
+    socket.join(roomId);
+
+    // Add user to room tracking
+    if (!roomUsers[roomId]) roomUsers[roomId] = [];
+    roomUsers[roomId] = roomUsers[roomId].filter(u => u.socketId !== socket.id);
+    roomUsers[roomId].push({ userId, userName, socketId: socket.id });
+
+    console.log(`${userName} joined room ${roomId}`);
+
+    // Send current code
+    try {
+      const { prisma } = await import('./lib/prisma');
+      const room = await prisma.room.findUnique({ where: { id: roomId } });
+      if (room) {
+        socket.emit('load-code', { code: room.code, language: room.language });
+      }
+    } catch (err) {
+      console.error(err);
+    }
+
+    // Notify everyone about current users
+    io.to(roomId).emit('room-users', roomUsers[roomId]);
+    socket.to(roomId).emit('user-joined', { userId, userName, socketId: socket.id });
   });
-};
+
+  socket.on('code-change', async ({ roomId, code }) => {
+    socket.to(roomId).emit('code-update', { code });
+
+    // Save to database
+    try {
+      const { prisma } = await import('./lib/prisma');
+      await prisma.room.update({
+        where: { id: roomId },
+        data: { code },
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  });
+
+  socket.on('leave-room', ({ roomId, userName }) => {
+    socket.leave(roomId);
+    if (roomUsers[roomId]) {
+      roomUsers[roomId] = roomUsers[roomId].filter(u => u.socketId !== socket.id);
+      io.to(roomId).emit('room-users', roomUsers[roomId]);
+    }
+    socket.to(roomId).emit('user-left', { userName, socketId: socket.id });
+  });
+
+  socket.on('disconnect', () => {
+    // Remove from all rooms
+    Object.keys(roomUsers).forEach(roomId => {
+      const before = roomUsers[roomId]?.length;
+      roomUsers[roomId] = roomUsers[roomId]?.filter(u => u.socketId !== socket.id) || [];
+      if (roomUsers[roomId].length !== before) {
+        io.to(roomId).emit('room-users', roomUsers[roomId]);
+      }
+    });
+    console.log(`❌ User disconnected: ${socket.id}`);
+  });
+});
+
+const PORT = process.env.PORT || 4000;
+httpServer.listen(PORT, () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+});

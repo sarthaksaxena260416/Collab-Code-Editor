@@ -24,7 +24,9 @@ model Room {
   description String?
   language    String     @default("javascript")
   code        String     @default("")
+  roomCode    String     @unique
   isActive    Boolean    @default(true)
+  maxUsers    Int        @default(3)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   users       RoomUser[]

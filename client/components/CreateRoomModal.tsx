@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useUser } from '@clerk/nextjs';
 import {
   Dialog, DialogContent, DialogHeader,
   DialogTitle, DialogTrigger,
@@ -17,6 +18,7 @@ import { LANGUAGES } from '@/types';
 
 export default function CreateRoomModal() {
   const router = useRouter();
+  const { user } = useUser();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -24,31 +26,35 @@ export default function CreateRoomModal() {
   const [loading, setLoading] = useState(false);
 
   const handleCreate = async () => {
-  if (!name.trim()) return;
-  setLoading(true);
-  try {
-    // First sync the user to our database
-    await fetch('/api/sync-user', { method: 'POST' });
-
-    // Then create the room via Express backend
-    const res = await fetch(`http://localhost:4000/api/rooms`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, description, language }),
-    });
-    const room = await res.json();
-    if (room.id) {
-      setOpen(false);
-      router.push(`/room/${room.id}`);
-    } else {
-      console.error('Room creation failed:', room);
+    if (!name.trim()) return;
+    setLoading(true);
+    try {
+      const res = await fetch('http://localhost:4000/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          description,
+          language,
+          clerkId: user?.id,
+          userName: user?.fullName || user?.firstName || 'Anonymous',
+          userEmail: user?.primaryEmailAddress?.emailAddress || '',
+          userAvatar: user?.imageUrl || '',
+        }),
+      });
+      const room = await res.json();
+      if (room.id) {
+        setOpen(false);
+        router.push(`/room/${room.id}`);
+      } else {
+        console.error('Room creation failed:', room);
+      }
+    } catch (err) {
+      console.error('Failed to create room:', err);
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    console.error('Failed to create room:', err);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

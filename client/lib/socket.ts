@@ -4,9 +4,8 @@ let socket: Socket | null = null;
 
 export const getSocket = (): Socket => {
   if (!socket) {
-    socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000', {
-      transports: ['websocket'],
-      autoConnect: false,
+    socket = io('http://localhost:4000', {
+      transports: ['websocket', 'polling'],
     });
   }
   return socket;
@@ -24,4 +23,5 @@ export const disconnectSocket = (): void => {
   if (socket?.connected) {
     socket.disconnect();
   }
+  socket = null;
 };
