@@ -1,5 +1,5 @@
 'use client';
-
+import { useSession } from 'next-auth/react';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -19,6 +19,7 @@ const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000'
 
 export default function CreateRoomModal() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -33,14 +34,14 @@ export default function CreateRoomModal() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name,
-          description,
-          language,
-          clerkId: `guest_${Math.random().toString(36).substring(2, 9)}`,
-          userName: 'Guest',
-          userEmail: `guest_${Date.now()}@temp.com`,
-          userAvatar: '',
-        }),
+  name,
+  description,
+  language,
+  clerkId: session?.user?.id || `guest_${Date.now()}`,
+  userName: session?.user?.name || 'Anonymous',
+  userEmail: session?.user?.email || '',
+  userAvatar: session?.user?.image || '',
+}),
       });
       const room = await res.json();
       if (room.id) {

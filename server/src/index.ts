@@ -60,18 +60,20 @@ app.post('/api/rooms', async (req, res) => {
   try {
     const { prisma } = await import('./lib/prisma');
     const { name, description, language, clerkId, userName, userEmail, userAvatar } = req.body;
-
-    let user = await prisma.user.findUnique({ where: { clerkId } });
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          clerkId,
-          name: userName || 'Anonymous',
-          email: userEmail || `${clerkId}@temp.com`,
-          avatar: userAvatar || '',
-        },
-      });
-    }
+let user = await prisma.user.upsert({
+  where: { clerkId },
+  update: {
+    name: userName || 'Anonymous',
+    email: userEmail || `${clerkId}@temp.com`,
+    avatar: userAvatar || '',
+  },
+  create: {
+    clerkId,
+    name: userName || 'Anonymous',
+    email: userEmail || `${clerkId}@temp.com`,
+    avatar: userAvatar || '',
+  },
+});
 
     let roomCode = generateRoomCode();
     let exists = await prisma.room.findUnique({ where: { roomCode } });
@@ -149,6 +151,18 @@ io.on('connection', (socket) => {
       await prisma.room.update({
         where: { id: roomId },
         data: { code },
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  });
+  socket.on('language-change', async ({ roomId, language }) => {
+    socket.to(roomId).emit('language-update', { language });
+    try {
+      const { prisma } = await import('./lib/prisma');
+      await prisma.room.update({
+        where: { id: roomId },
+        data: { language },
       });
     } catch (err) {
       console.error(err);
