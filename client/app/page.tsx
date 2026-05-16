@@ -44,7 +44,7 @@ export default async function HomePage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {rooms.map((room: any) => (
+              {rooms.map((room: {id: string; name: string; description?: string; language: string; roomCode?: string; createdAt: string; _count?: {users: number}}) => (
                 <Link key={room.id} href={`/room/${room.id}`}>
                   <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 hover:border-blue-500 hover:bg-gray-800 transition-all cursor-pointer group">
                     <div className="flex items-start justify-between mb-3">

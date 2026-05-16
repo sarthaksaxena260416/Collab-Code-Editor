@@ -40,7 +40,7 @@ export default function RoomPage() {
   const [roomFull, setRoomFull] = useState(false);
   const [copied, setCopied] = useState(false);
   const socketRef = useRef<Socket | null>(null);
-  const userNameRef = useRef(`User_${Math.floor(Math.random() * 1000)}`);
+  const userNameRef = useRef('Anonymous');
 
   useEffect(() => {
     if (!roomId) return;
@@ -48,7 +48,7 @@ export default function RoomPage() {
     fetch(`${SOCKET_URL}/api/rooms`)
       .then(r => r.json())
       .then(rooms => {
-        const room = rooms.find((r: any) => r.id === roomId);
+        const room = rooms.find((r: (r: {id: string; name: string; roomCode?: string; language: string})) => r.id === roomId);
         if (room) {
           setRoomCode(room.roomCode);
           setRoomName(room.name);
