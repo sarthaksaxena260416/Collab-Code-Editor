@@ -48,12 +48,12 @@ export default function RoomPage() {
     fetch(`${SOCKET_URL}/api/rooms`)
       .then(r => r.json())
       .then(rooms => {
-        const room = rooms.find((r: (r: {id: string; name: string; roomCode?: string; language: string})) => r.id === roomId);
-        if (room) {
-          setRoomCode(room.roomCode);
-          setRoomName(room.name);
-        }
-      });
+  const room = rooms.find((r: any) => r.id === roomId);
+  if (room) {
+    setRoomCode(room.roomCode);
+    setRoomName(room.name);
+  }
+});
 
     const socket = io(SOCKET_URL);
     socketRef.current = socket;
