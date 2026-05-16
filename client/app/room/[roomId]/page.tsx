@@ -55,7 +55,10 @@ export default function RoomPage() {
   }
 });
 
-    const socket = io(SOCKET_URL);
+    const socket = io(SOCKET_URL, {
+  transports: ['polling', 'websocket'],
+  upgrade: true,
+});
     socketRef.current = socket;
 
     socket.on('connect', () => {
