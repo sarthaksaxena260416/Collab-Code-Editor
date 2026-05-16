@@ -11,18 +11,24 @@ const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
   cors: {
-    origin: ['https://collab-code-editor-ggl1.vercel.app', 'http://localhost:3000'],
+    origin: [
+      'https://collab-code-editor-ggl1.vercel.app',
+      'http://localhost:3000',
+      /\.vercel\.app$/,
+    ],
     methods: ['GET', 'POST'],
     credentials: true,
   },
-  transports: ['polling', 'websocket'],
 });
 
 app.use(cors({
-  origin: ['https://collab-code-editor-ggl1.vercel.app', 'http://localhost:3000'],
+  origin: [
+    'https://collab-code-editor-ggl1.vercel.app',
+    'http://localhost:3000',
+    /\.vercel\.app$/,
+  ],
   credentials: true,
 }));
-app.use(express.json());
 
 const roomUsers: Record<string, { userId: string; userName: string; socketId: string }[]> = {};
 
