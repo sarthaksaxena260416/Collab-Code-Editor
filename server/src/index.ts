@@ -29,6 +29,8 @@ app.use(cors({
   ],
   credentials: true,
 }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 const roomUsers: Record<string, { userId: string; userName: string; socketId: string }[]> = {};
 
