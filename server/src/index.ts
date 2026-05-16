@@ -10,10 +10,17 @@ const app = express();
 const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
-  cors: { origin: '*', methods: ['GET', 'POST'] },
+  cors: {
+    origin: ['https://collab-code-editor-ggl1.vercel.app', 'http://localhost:3000'],
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },
 });
 
-app.use(cors({ origin: '*' }));
+app.use(cors({
+  origin: ['https://collab-code-editor-ggl1.vercel.app', 'http://localhost:3000'],
+  credentials: true,
+}));
 app.use(express.json());
 
 const roomUsers: Record<string, { userId: string; userName: string; socketId: string }[]> = {};
