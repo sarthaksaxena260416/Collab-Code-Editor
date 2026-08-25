@@ -8,25 +8,23 @@ dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
+const allowedOrigins = [
+  'https://collab-code-editor-ggl1.vercel.app',
+  'http://localhost:3000',
+  ...(process.env.CLIENT_ORIGIN ? [process.env.CLIENT_ORIGIN] : []),
+  /\.vercel\.app$/,
+];
 
 const io = new Server(httpServer, {
   cors: {
-    origin: [
-      'https://collab-code-editor-ggl1.vercel.app',
-      'http://localhost:3000',
-      /\.vercel\.app$/,
-    ],
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
     credentials: true,
   },
 });
 
 app.use(cors({
-  origin: [
-    'https://collab-code-editor-ggl1.vercel.app',
-    'http://localhost:3000',
-    /\.vercel\.app$/,
-  ],
+  origin: allowedOrigins,
   credentials: true,
 }));
 app.use(express.json());
