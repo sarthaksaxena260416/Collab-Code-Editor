@@ -2,6 +2,7 @@ services:
   - type: web
     name: collab-code-editor-server
     runtime: node
+    plan: free
     rootDir: server
     buildCommand: npm ci && npm run build
     startCommand: npm run db:migrate:deploy && npm start
